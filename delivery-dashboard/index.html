@@ -83,10 +83,14 @@
 <div id="login" class="login-wrap">
   <div class="login-card">
     <div class="brand">Trig <span>Delivery</span></div>
-    <p>Receiving &amp; delivery routes. Sign in with your Trig email — we'll send a one-tap link.</p>
-    <input id="email" class="field" type="email" placeholder="you@trigmodern.com" autocomplete="email" />
-    <button id="sendLink" class="btn">Send my sign-in link</button>
+    <p>Receiving &amp; delivery routes. Sign in with your Trig email.</p>
+    <form id="loginForm" autocomplete="on">
+      <input id="email" class="field" type="email" placeholder="you@trigmodern.com" autocomplete="username" />
+      <input id="password" class="field" type="password" placeholder="Password" autocomplete="current-password" />
+      <button id="signIn" class="btn" type="submit">Sign in</button>
+    </form>
     <div id="loginMsg" class="note"></div>
+    <div class="note"><a href="#" id="magicLink">First time or forgot your password? Email me a sign-in link →</a></div>
   </div>
 </div>
 
@@ -96,6 +100,7 @@
     <div class="brand">Trig <span>Delivery</span></div>
     <div class="spacer"></div>
     <span id="who" class="who"></span>
+    <button id="setPw" class="ghost">Set password</button>
     <button id="refresh" class="ghost">↻</button>
     <button id="signout" class="ghost">Sign out</button>
   </header>
@@ -161,14 +166,33 @@ async function init(){
   sb.auth.onAuthStateChange((_e,s)=> s ? showApp(s.user.email) : showLogin());
 }
 function showLogin(){ $('#login').classList.remove('hidden'); $('#app').classList.add('hidden'); }
-$('#sendLink').onclick = async ()=>{
-  const email = $('#email').value.trim().toLowerCase();
-  if(!email){ $('#loginMsg').textContent='Enter your email first.'; return; }
+const emailVal = ()=> $('#email').value.trim().toLowerCase();
+$('#loginForm').onsubmit = async (e)=>{
+  e.preventDefault();
+  const email = emailVal(), password = $('#password').value;
   if(!email.endsWith(TRIG_DOMAIN)){ $('#loginMsg').textContent='Use your @trigmodern.com email.'; return; }
-  $('#sendLink').disabled=true;
+  if(!password){ $('#loginMsg').textContent='Enter your password — or use the email-link option below the first time.'; return; }
+  $('#signIn').disabled=true; $('#loginMsg').textContent='Signing in…';
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  $('#signIn').disabled=false;
+  if(error) $('#loginMsg').textContent = /invalid/i.test(error.message)
+    ? 'Wrong email or password. First time? Use the email-link below, then set a password.'
+    : ('Error: '+error.message);
+};
+$('#magicLink').onclick = async (e)=>{
+  e.preventDefault();
+  const email = emailVal();
+  if(!email.endsWith(TRIG_DOMAIN)){ $('#loginMsg').textContent='Enter your @trigmodern.com email first.'; return; }
   const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href.split('#')[0] }});
-  $('#sendLink').disabled=false;
-  $('#loginMsg').textContent = error ? ('Error: '+error.message) : "Check your inbox — tap the link and you'll land right here, signed in.";
+  $('#loginMsg').textContent = error ? ('Error: '+error.message)
+    : "Check your inbox — tap the link and you'll land here signed in. Then hit “Set password” so next time you just type it.";
+};
+$('#setPw').onclick = async ()=>{
+  const pw = prompt('Set a password for '+state.email+' (min 6 chars). Next time, just sign in with your email + this password.');
+  if(pw===null) return;
+  if(pw.length<6){ toast('Too short — min 6 characters'); return; }
+  const { error } = await sb.auth.updateUser({ password: pw });
+  toast(error ? ('Error: '+error.message) : 'Password set ✓ — use it next time');
 };
 $('#signout').onclick = ()=> sb.auth.signOut();
 $('#refresh').onclick = ()=> loadAll();

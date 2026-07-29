@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Trig Ops — Order Pipeline</title>
+<style>
+  :root{
+    --orange:#f4691c; --orange-deep:#E0512F; --blue:#30508c;
+    --ink:#1c1b1a; --muted:#6b6763; --line:#e7e3de; --bg:#faf8f5; --card:#ffffff;
+    --done:#2f8f6b; --now:#f4691c; --todo:#d9d4cd; --red:#c0392b; --promo:#b8860b;
+    --shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.06);
+    --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--font);color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .hidden{display:none!important}
+
+  /* Login */
+  .login-wrap{min-height:100vh;display:grid;place-items:center;padding:24px}
+  .login-card{background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);
+    padding:36px;max-width:400px;width:100%;text-align:center}
+  .brand{font-weight:800;font-size:22px;letter-spacing:-.02em}
+  .brand span{color:var(--orange)}
+  .login-card p{color:var(--muted);font-size:14px;line-height:1.5;margin:8px 0 24px}
+  .field{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:12px;font-size:15px;font-family:inherit;margin-bottom:12px}
+  .field:focus{outline:none;border-color:var(--blue)}
+  .btn{background:var(--orange);color:#fff;border:none;border-radius:12px;padding:13px 18px;font-size:15px;
+    font-weight:600;font-family:inherit;cursor:pointer;width:100%;transition:filter .15s}
+  .btn:hover{filter:brightness(.96)}
+  .btn.secondary{background:transparent;color:var(--muted);border:1px solid var(--line);width:auto;padding:8px 14px;font-size:13px}
+  .note{font-size:13px;color:var(--muted);margin-top:16px;line-height:1.5}
+
+  /* Shell */
+  header.topbar{position:sticky;top:0;z-index:10;background:rgba(250,248,245,.85);backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);padding:14px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .topbar .brand{font-size:18px}
+  .spacer{flex:1}
+  .who{font-size:13px;color:var(--muted)}
+  .toolbar{padding:12px 22px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+  select,.search{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 11px;font-size:13px;font-family:inherit}
+  .search{min-width:170px}
+  .tog{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}
+  .tog[aria-pressed="false"]{opacity:.4}
+
+  /* Pipeline overview */
+  .pipe{display:flex;gap:8px;padding:18px 22px 6px;overflow-x:auto}
+  .stage{flex:1 0 130px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 13px;
+    cursor:pointer;position:relative;transition:transform .1s,box-shadow .1s}
+  .stage:hover{transform:translateY(-1px);box-shadow:var(--shadow)}
+  .stage[aria-selected="true"]{border-color:var(--orange);box-shadow:0 0 0 2px rgba(244,105,28,.15)}
+  .stage .n{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1}
+  .stage .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-top:5px}
+  .stage .tick{height:4px;border-radius:2px;background:var(--todo);margin-top:9px}
+  .stage .amt{font-size:11px;color:var(--muted);margin-top:6px}
+
+  .layout{display:grid;grid-template-columns:1fr 320px;gap:18px;padding:14px 22px 30px;align-items:start}
+  @media(max-width:900px){.layout{grid-template-columns:1fr}}
+  .sec-h{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:6px 2px 10px;font-weight:700}
+
+  /* Order rows */
+  .order{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:11px;box-shadow:var(--shadow);cursor:pointer}
+  .order .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px}
+  .order .name{font-weight:700;font-size:15px;letter-spacing:-.01em}
+  .order .name .side{font-weight:600;font-size:11px;color:#fff;background:var(--blue);border-radius:5px;padding:1px 6px;margin-left:8px;vertical-align:middle}
+  .order .name .side.vend{background:var(--orange-deep)}
+  .order .sub{font-size:12px;color:var(--muted);margin-top:2px}
+  .order .right{text-align:right;white-space:nowrap}
+  .order .amt{font-weight:800;font-size:15px}
+  .order .ago{font-size:11px;color:var(--muted);margin-top:2px}
+  .order .inv{display:inline-block;font-size:11px;font-weight:700;color:var(--blue);background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-top:3px}
+  .order .inv:hover{text-decoration:underline}
+  .pay{display:inline-block;font-size:10px;font-weight:800;color:#fff;background:var(--now);border-radius:5px;padding:1px 6px;margin-left:6px;text-transform:uppercase}
+  .order .doc{display:block;margin-top:4px;font-size:11px;font-weight:700;color:var(--orange-deep);background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-left:auto}
+  .order .doc:hover{text-decoration:underline}
+  .flag{display:inline-block;font-size:10px;font-weight:800;color:#fff;background:var(--red);border-radius:5px;padding:1px 6px;margin-left:6px;text-transform:uppercase}
+
+  /* Stepper */
+  .stepper{display:flex;align-items:flex-start;gap:0;margin-top:4px}
+  .step{flex:1;display:flex;flex-direction:column;align-items:center;position:relative;min-width:0}
+  .step .bar{position:absolute;top:9px;left:-50%;width:100%;height:2px;background:var(--todo);z-index:0}
+  .step:first-child .bar{display:none}
+  .step.done .bar,.step.now .bar{background:var(--done)}
+  .step .node{width:20px;height:20px;border-radius:50%;background:var(--todo);z-index:1;display:grid;place-items:center;
+    font-size:11px;color:#fff;font-weight:800}
+  .step.done .node{background:var(--done)}
+  .step.now .node{background:var(--now);box-shadow:0 0 0 4px rgba(244,105,28,.18)}
+  .step .cap{font-size:10px;color:var(--muted);margin-top:6px;text-align:center;line-height:1.2}
+  .step.now .cap{color:var(--ink);font-weight:700}
+  .now-chip{font-size:11px;font-weight:700;color:var(--now);margin-top:10px}
+
+  /* expand */
+  .hist{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
+  .hist .ev{display:flex;gap:10px;align-items:baseline;font-size:12px;padding:3px 0}
+  .hist .ev a{color:var(--blue);text-decoration:none}
+  .hist .ev .t{color:var(--muted);white-space:nowrap;min-width:52px}
+  .hist .ev .c{font-weight:700;text-transform:capitalize;min-width:120px}
+  .prod{margin-bottom:10px}
+  .prod-h{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;margin-bottom:5px}
+  .prod-i{font-size:12px;color:#38352f;line-height:1.45;padding:3px 0 3px 10px;border-left:2px solid var(--now);margin-bottom:5px}
+  .evlink{background:none;border:none;color:var(--blue);cursor:pointer;padding:0;font:inherit;text-align:left}
+  .evlink:hover{text-decoration:underline}
+
+  /* alerts rail */
+  .rail .acard{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--promo);border-radius:12px;
+    padding:11px 13px;margin-bottom:10px;text-decoration:none;display:block;box-shadow:var(--shadow)}
+  .rail .acard.disc{border-left-color:var(--red)}
+  .rail .acard .v{font-weight:700;font-size:13px}
+  .rail .acard .s{font-size:12px;color:#38352f;margin-top:3px;line-height:1.35}
+  .rail .acard .m{font-size:11px;color:var(--muted);margin-top:5px}
+  .rail .acard.dlv.ready{border-left-color:var(--now)}
+  .rail .acard.dlv.sched{border-left-color:var(--blue)}
+  .rail .acard.bill{border-left-color:var(--red)}
+  .rail .acard.bill.paid{opacity:.55;border-left-color:var(--done)}
+  .rail .pd{font-size:10px;font-weight:800;color:var(--done);margin-left:6px;text-transform:uppercase}
+  .rail .due{font-size:10px;font-weight:800;color:var(--red);margin-left:6px;text-transform:uppercase}
+  .rail .raildoc{background:none;border:none;color:var(--orange-deep);font:inherit;font-size:11px;cursor:pointer;padding:0}
+  .rail .raildoc:hover{text-decoration:underline}
+  .rail .m a{color:var(--blue);text-decoration:none}
+  .rail-note{font-weight:600;text-transform:none;letter-spacing:0;color:var(--muted);font-size:10px;margin-left:4px}
+  .empty{color:var(--muted);font-size:13px;padding:16px;text-align:center;border:1px dashed var(--line);border-radius:12px}
+  .status-line{padding:9px 22px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line)}
+  /* embedded calendar view */
+  #calview{display:none;padding:14px 22px}
+  #calview iframe{width:100%;height:calc(100vh - 90px);border:1px solid var(--line);border-radius:12px;background:#fff}
+  #app.calmode .toolbar,#app.calmode #statusLine,#app.calmode #brief,#app.calmode #pipe,#app.calmode .layout{display:none}
+  #app.calmode #calview{display:block}
+  /* quick-view modal */
+  .modal{position:fixed;inset:0;z-index:50;background:rgba(28,27,26,.55);backdrop-filter:blur(3px);display:grid;place-items:center;padding:24px}
+  .modal-card{background:var(--card);border-radius:16px;width:min(920px,94vw);height:min(90vh,900px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+  .modal-bar{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .modal-bar .mt{font-weight:700;font-size:14px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .modal-bar a{font-size:12px;font-weight:700;color:var(--blue);text-decoration:none;white-space:nowrap}
+  .modal-bar button{background:none;border:none;font-size:20px;line-height:1;color:var(--muted);cursor:pointer;padding:0 2px}
+  .modal iframe{flex:1;border:0;width:100%;background:#f2efea}
+  /* morning brief panel */
+  .brief{margin:14px 22px 0;background:var(--card);border:1px solid var(--line);border-left:3px solid var(--now);border-radius:12px;padding:13px 16px;box-shadow:var(--shadow)}
+  .brief h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .brief .tog2{float:right;font-size:11px;color:var(--blue);cursor:pointer;background:none;border:none;font-family:inherit}
+  .brief .bd{font-size:13px;line-height:1.5;color:#38352f}
+  .brief .bd h3{font-size:12px;margin:9px 0 2px;color:var(--ink);text-transform:uppercase;letter-spacing:.03em}
+  .brief .bd ul{margin:2px 0 6px;padding-left:18px}
+  .brief .bd li{margin:2px 0}
+  .brief .bd p{margin:3px 0}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login" class="login-wrap">
+  <div class="login-card">
+    <div class="brand">Trig<span>Ops</span></div>
+    <p>Sign in to your order pipeline. We'll email you a one-time login link.</p>
+    <input id="email" class="field" type="email" placeholder="you@trigmodern.com" autocomplete="email" />
+    <button id="sendLink" class="btn">Email me a login link</button>
+    <div id="loginMsg" class="note"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <header class="topbar">
+    <div class="brand">Trig<span>Ops</span></div>
+    <div class="spacer"></div>
+    <span class="who" id="who"></span>
+    <button class="btn secondary" id="viewCal">📅 Calendar</button>
+    <button class="btn secondary" id="refresh">Refresh</button>
+    <button class="btn secondary" id="signout">Sign out</button>
+  </header>
+
+  <div class="toolbar">
+    <select id="side">
+      <option value="">All orders</option>
+      <option value="customer">Customer orders</option>
+      <option value="vendor">Vendor / PO orders</option>
+    </select>
+    <select id="window">
+      <option value="14">Last 14 days</option>
+      <option value="30" selected>Last 30 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="0">All time</option>
+    </select>
+    <select id="vendorFilter"><option value="">All vendors</option></select>
+    <input id="search" class="search" placeholder="Search orders…" />
+    <div class="spacer"></div>
+    <button class="tog" id="togPromo" data-type="promotion" aria-pressed="true">Promotions</button>
+    <button class="tog" id="togDisc" data-type="discontinuation" aria-pressed="true">Discontinued</button>
+  </div>
+
+  <div id="statusLine" class="status-line"></div>
+  <div id="brief" class="brief hidden"></div>
+  <div id="pipe" class="pipe"></div>
+
+  <div class="layout">
+    <div>
+      <div class="sec-h" id="ordersHead">Orders on the timeline</div>
+      <div id="orders"></div>
+    </div>
+    <div class="rail">
+      <div class="sec-h">Deliveries <span class="rail-note">ready / scheduled</span></div>
+      <div id="deliveries"></div>
+      <div class="sec-h" style="margin-top:20px">To pay <span class="rail-note">money out</span></div>
+      <div id="payables"></div>
+      <div class="sec-h" style="margin-top:20px">Vendor alerts</div>
+      <div id="alerts"></div>
+    </div>
+  </div>
+
+  <div id="calview">
+    <iframe title="Trig Communication Calendar" src="https://calendar.google.com/calendar/embed?src=c_ce3c98f29cb230c769e2c9f3dc630c4db0dffad261c510302cbc7ad5d0d7d6a9%40group.calendar.google.com&ctz=America%2FNew_York&mode=WEEK&showTitle=0&showPrint=0&showCalendars=0&showTz=0"></iframe>
+  </div>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-bar">
+        <span class="mt" id="modalTitle">Document</span>
+        <a id="modalOpen" href="#" target="_blank" rel="noopener">Open in new tab ↗</a>
+        <button id="modalClose" aria-label="Close">✕</button>
+      </div>
+      <iframe id="modalFrame" src="about:blank" referrerpolicy="no-referrer"></iframe>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const SUPABASE_URL = 'https://xyfogedlowneaevmjkci.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_ae3zGuAafiURw0AsjwXkvQ_amrQDJUu';
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// canonical lifecycle spine
+const STAGES = [
+  {key:'quote',     label:'Quote'},
+  {key:'invoiced',  label:'Invoiced'},
+  {key:'paid',      label:'Paid'},
+  {key:'ordered',   label:'Ordered'},
+  {key:'shipped',   label:'Shipped'},
+  {key:'delivered', label:'Delivered'},
+];
+const STEP_STAGE = {
+  estimate_created:0, estimate_updated:0, quote:0,
+  invoice_sent:1, invoice_received:1, overdue:1,
+  paid:2,
+  order_confirmation:3, oor:3, ordered:3, vendor_invoice_received:3,
+  awaiting_release_approval:4, released:4, ready_to_ship:4, shipped:4,
+  delivered:5,
+};
+const stageOf = s => STEP_STAGE[(s||'').toLowerCase()] ?? 3;
+
+let state = { signals:[], prefs:null, email:null, stageFilter:null, open:new Set() };
+const $ = s => document.querySelector(s);
+
+// ---------- auth ----------
+async function init(){
+  const { data:{ session } } = await sb.auth.getSession();
+  session ? showApp(session.user.email) : showLogin();
+  sb.auth.onAuthStateChange((_e,s)=> s ? showApp(s.user.email) : showLogin());
+}
+function showLogin(){ $('#login').classList.remove('hidden'); $('#app').classList.add('hidden'); }
+$('#sendLink').onclick = async ()=>{
+  const email = $('#email').value.trim();
+  if(!email){ $('#loginMsg').textContent='Enter your email first.'; return; }
+  $('#sendLink').disabled=true;
+  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: window.location.href.split('#')[0] }});
+  $('#sendLink').disabled=false;
+  $('#loginMsg').textContent = error ? ('Error: '+error.message)
+    : 'Check your inbox — click the link and you\'ll land right here, signed in.';
+};
+$('#signout').onclick = ()=> sb.auth.signOut();
+$('#viewCal').onclick = ()=>{ const on=$('#app').classList.toggle('calmode'); $('#viewCal').textContent = on ? '☰ Board' : '📅 Calendar'; };
+
+async function showApp(email){
+  // GATE: only Trig staff on the ops_users allowlist get in
+  const { data:allowed } = await sb.from('ops_users').select('email').eq('email', email).maybeSingle();
+  if(!allowed){
+    $('#app').classList.add('hidden'); $('#login').classList.remove('hidden');
+    $('#loginMsg').textContent = `${email} isn't authorized for the Trig ops dashboard. Ask Zach to add you.`;
+    await sb.auth.signOut();
+    return;
+  }
+  state.email=email;
+  $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
+  $('#who').textContent=email;
+  await loadPrefs(); await loadSignals(); loadBrief();
+}
+
+async function loadBrief(){
+  const el=$('#brief');
+  const { data } = await sb.from('ops_briefs').select('*').eq('kind','morning').order('created_at',{ascending:false}).limit(1).maybeSingle();
+  if(!data){ el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  el.innerHTML=`<h4>${esc(data.title||'Morning brief')} <button class="tog2" id="briefTog">hide</button></h4><div class="bd" id="briefBody">${mdLite(data.content)}</div>`;
+  $('#briefTog').onclick=()=>{ const b=$('#briefBody'); const h=b.style.display==='none'; b.style.display=h?'':'none'; $('#briefTog').textContent=h?'hide':'show'; };
+}
+function mdLite(t){
+  const lines=(t||'').split('\n'); let html='', ul=false;
+  for(let ln of lines){ ln=ln.trim();
+    if(/^#{1,6}\s/.test(ln)){ if(ul){html+='</ul>';ul=false;} html+='<h3>'+esc(ln.replace(/^#+\s/,''))+'</h3>'; }
+    else if(/^[-*]\s/.test(ln)){ if(!ul){html+='<ul>';ul=true;} html+='<li>'+esc(ln.replace(/^[-*]\s/,''))+'</li>'; }
+    else if(!ln){ if(ul){html+='</ul>';ul=false;} }
+    else { if(ul){html+='</ul>';ul=false;} html+='<p>'+esc(ln)+'</p>'; }
+  }
+  if(ul)html+='</ul>';
+  return html;
+}
+async function loadPrefs(){
+  const { data } = await sb.from('ops_dashboard_prefs').select('*').eq('user_email',state.email).maybeSingle();
+  state.prefs = data || { user_email:state.email, visible_types:['shipping','discontinuation','promotion','order_step'], vendor_filter:[] };
+  $('#togPromo').setAttribute('aria-pressed', state.prefs.visible_types.includes('promotion')?'true':'false');
+  $('#togDisc').setAttribute('aria-pressed', state.prefs.visible_types.includes('discontinuation')?'true':'false');
+}
+async function savePrefs(){
+  const vt=['shipping','order_step'];
+  if($('#togPromo').getAttribute('aria-pressed')==='true') vt.push('promotion');
+  if($('#togDisc').getAttribute('aria-pressed')==='true') vt.push('discontinuation');
+  state.prefs.visible_types=vt;
+  await sb.from('ops_dashboard_prefs').upsert({ user_email:state.email, visible_types:vt, vendor_filter:state.prefs.vendor_filter||[], updated_at:new Date().toISOString() });
+}
+
+async function loadSignals(){
+  $('#statusLine').textContent='Loading…';
+  const days=+$('#window').value;
+  let q=sb.from('ops_signals').select('*').order('occurred_at',{ascending:false}).limit(800);
+  if(days>0) q=q.gte('occurred_at', new Date(Date.now()-days*864e5).toISOString());
+  const { data, error }=await q;
+  if(error){ $('#statusLine').textContent=''; $('#orders').innerHTML=`<div class="empty">Couldn't load: ${error.message}.<br>Your email may not be on the staff allowlist yet.</div>`; return; }
+  state.signals=data||[]; buildVendorFilter(); render();
+}
+function buildVendorFilter(){
+  const sel=$('#vendorFilter'), cur=sel.value;
+  const vs=[...new Set(state.signals.map(s=>s.vendor).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">All vendors</option>'+vs.map(v=>`<option>${v}</option>`).join(''); sel.value=cur;
+}
+const timeAgo=iso=>{const d=(Date.now()-new Date(iso))/1000;if(d<3600)return Math.max(1,Math.floor(d/60))+'m';if(d<86400)return Math.floor(d/3600)+'h';return Math.floor(d/86400)+'d';};
+const money=c=>c==null?'':'$'+(c/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc=s=>(s||'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+
+// group order-lifecycle signals into orders (shared client_ref merges a customer order with its vendor PO)
+function buildOrders(){
+  const flow=state.signals.filter(s=>s.signal_type==='order_step'||s.signal_type==='shipping');
+  const map=new Map();
+  for(const s of flow){
+    const key = s.client_ref || `${(s.client||s.vendor||s.party||'—')}|${s.order_ref||s.source_id}`;
+    if(!map.has(key)) map.set(key,{key,events:[]});
+    const o=map.get(key); o.events.push(s);
+    if(s.client&&!o.client) o.client=s.client;
+    if(s.vendor&&!o.vendor) o.vendor=s.vendor;
+    if(s.sku&&!o.sku) o.sku=s.sku;
+    if(s.party&&!o.party) o.party=s.party;
+    if(s.order_ref&&!o.order_ref) o.order_ref=s.order_ref;
+    if(s.source==='square'&&s.link&&!o.invoiceUrl) o.invoiceUrl=s.link;
+    if(s.doc_path&&!o.docPath){ o.docPath=s.doc_path; o.docLabel=s.doc_label; }
+    if(s.doc_url&&!o.docUrl){ o.docUrl=s.doc_url; if(!o.docLabel)o.docLabel=s.doc_label; }
+    if(s.direction==='payable') o.payable=true;
+    if(s.direction==='receivable') o.receivable=true;
+    if(s.product){ o.products=o.products||[]; if(!o.products.includes(s.product)) o.products.push(s.product); }
+    o.matched = o.matched || !!s.client_ref;
+  }
+  const orders=[...map.values()].map(o=>{
+    o.side = o.client ? 'customer' : 'vendor';
+    o.name = o.client || o.vendor || o.party || '—';
+    o.events.sort((a,b)=>new Date(a.occurred_at)-new Date(b.occurred_at));
+    o.stage=Math.max(...o.events.map(e=>stageOf(e.status_step)));
+    const last=o.events[o.events.length-1];
+    o.last=last.occurred_at; o.nowStep=last.status_step;
+    o.amount=o.events.map(e=>e.amount_cents).filter(v=>v!=null).pop() ?? null;
+    o.overdue=o.events.some(e=>(e.status_step||'').toLowerCase()==='overdue') && o.stage<2;
+    o.link=last.link;
+    return o;
+  });
+  return orders;
+}
+
+function render(){
+  const side=$('#side').value, vf=$('#vendorFilter').value, term=$('#search').value.trim().toLowerCase();
+  let orders=buildOrders();
+  // payables (bills we owe) live in the right rail, not the order pipeline
+  orders=orders.filter(o=> !(o.payable && !o.client && !o.receivable));
+  if(side) orders=orders.filter(o=>o.side===side);
+  if(vf) orders=orders.filter(o=>o.name===vf);
+  if(term) orders=orders.filter(o=>[o.name,o.order_ref,o.nowStep].filter(Boolean).join(' ').toLowerCase().includes(term));
+
+  // pipeline overview (counts by current stage)
+  const counts=STAGES.map(()=>0), sums=STAGES.map(()=>0);
+  orders.forEach(o=>{counts[o.stage]++; if(o.amount)sums[o.stage]+=o.amount;});
+  $('#pipe').innerHTML=STAGES.map((st,i)=>`
+    <div class="stage" data-stage="${i}" aria-selected="${state.stageFilter===i}">
+      <div class="n">${counts[i]}</div><div class="lbl">${st.label}</div>
+      <div class="tick" style="background:${i<=Math.max(...orders.map(o=>o.stage),0)&&counts[i]?'var(--now)':'var(--todo)'}"></div>
+      <div class="amt">${sums[i]?money(sums[i]):'&nbsp;'}</div>
+    </div>`).join('');
+  document.querySelectorAll('.stage').forEach(el=>el.onclick=()=>{
+    const i=+el.dataset.stage; state.stageFilter = state.stageFilter===i?null:i; render();
+  });
+
+  let shown = state.stageFilter==null ? orders : orders.filter(o=>o.stage===state.stageFilter);
+  shown.sort((a,b)=>new Date(b.last)-new Date(a.last));
+
+  $('#ordersHead').textContent = state.stageFilter==null ? 'Orders on the timeline'
+    : `Orders at "${STAGES[state.stageFilter].label}"`;
+
+  $('#orders').innerHTML = shown.length ? shown.map(o=>orderRow(o)).join('')
+    : '<div class="empty">No orders match.</div>';
+  document.querySelectorAll('.order').forEach(el=>el.onclick=()=>{
+    const k=el.dataset.k; state.open.has(k)?state.open.delete(k):state.open.add(k); render();
+  });
+
+  renderAlerts(vf,term);
+  renderPayables(vf,term);
+  renderDeliveries();
+
+  const t=orders.length;
+  $('#statusLine').textContent=`${t} order${t===1?'':'s'} in view · updated ${new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
+}
+
+function orderRow(o){
+  const steps=STAGES.map((st,i)=>{
+    const cls=i<o.stage?'done':i===o.stage?'now':'';
+    const mark=i<o.stage?'✓':(i===o.stage?'':'');
+    return `<div class="step ${cls}"><div class="bar"></div><div class="node">${mark}</div><div class="cap">${st.label}</div></div>`;
+  }).join('');
+  const open=state.open.has(o.key);
+  const prod=(o.products&&o.products.length)
+    ? `<div class="prod"><div class="prod-h">Products</div>${o.products.map(p=>`<div class="prod-i">${esc(p)}</div>`).join('')}</div>` : '';
+  const evs=o.events.slice().reverse().map(e=>{
+    const label=esc(e.subject||(e.status_step||'').replace(/_/g,' '));
+    let act;
+    if(e.doc_url) act=`<button class="evlink" data-modal="${esc(e.doc_url)}" data-label="${esc(e.doc_label||'File')}" onclick="event.stopPropagation()">${label} 📎</button>`;
+    else if(e.link && e.link.indexOf('squareup.com')>-1) act=`<a href="${esc(e.link)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${label} ↗</a>`;
+    else act=`<span>${label}</span>`;
+    return `<div class="ev"><span class="t">${new Date(e.occurred_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span><span class="c">${esc((e.status_step||'').replace(/_/g,' '))}</span>${act}</div>`;
+  }).join('');
+  const hist=open?`<div class="hist">${prod}${evs}</div>`:'';
+  const bits=[];
+  if(o.side==='customer'&&o.vendor) bits.push(esc(o.vendor));
+  if(o.sku) bits.push(esc(o.sku)); else if(o.order_ref) bits.push('#'+esc(o.order_ref));
+  bits.push(o.events.length+' step'+(o.events.length===1?'':'s'));
+  const tag = o.side==='vendor' ? 'PO' : (o.matched?'Client · linked':'Client');
+  return `<div class="order" data-k="${esc(o.key)}">
+    <div class="top">
+      <div><div class="name">${esc(o.name)}<span class="side ${o.side==='vendor'?'vend':''}">${tag}</span>${o.payable&&!o.receivable?'<span class="pay">To pay</span>':''}${o.overdue?'<span class="flag">Overdue</span>':''}</div>
+        <div class="sub">${bits.join(' · ')}</div></div>
+      <div class="right"><div class="amt">${money(o.amount)}</div>${o.invoiceUrl?`<a class="inv" href="${esc(o.invoiceUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Invoice ↗</a>`:''}${o.docUrl?`<button class="doc" data-modal="${esc(o.docUrl)}" data-label="${esc(o.docLabel||'File')}" onclick="event.stopPropagation()">📎 ${esc(o.docLabel||'View file')}</button>`:o.docPath?`<button class="doc" data-doc="${esc(o.docPath)}" onclick="event.stopPropagation()">📎 ${esc(o.docLabel||'View file')}</button>`:''}<div class="ago">${timeAgo(o.last)} ago</div></div>
+    </div>
+    <div class="stepper">${steps}</div>
+    <div class="now-chip">Now: ${esc((o.nowStep||'').replace(/_/g,' '))||'—'}</div>
+    ${hist}
+  </div>`;
+}
+
+function renderDeliveries(){
+  const rel=state.signals.filter(s=>['ready_to_deliver','delivery_scheduled','delivered'].includes(s.status_step));
+  const map=new Map();
+  rel.forEach(s=>{ const k=s.client_ref||s.source_id; if(!map.has(k)) map.set(k,{who:s.client||s.party||'—',events:[]}); map.get(k).events.push(s); });
+  let items=[...map.values()].map(d=>{
+    d.events.sort((a,b)=>new Date(a.occurred_at)-new Date(b.occurred_at));
+    const last=d.events[d.events.length-1];
+    d.status=last.status_step; d.when=last.occurred_at; d.subject=last.subject; return d;
+  }).filter(d=>d.status!=='delivered');
+  items.sort((a,b)=>new Date(a.when)-new Date(b.when));
+  $('#deliveries').innerHTML = items.length ? items.map(d=>`
+    <div class="acard dlv ${d.status==='delivery_scheduled'?'sched':'ready'}">
+      <div class="v">${esc(d.who)}<span class="${d.status==='delivery_scheduled'?'pd':'due'}">${d.status==='delivery_scheduled'?'scheduled':'ready'}</span></div>
+      <div class="s">${esc(d.subject||'')}</div>
+    </div>`).join('') : '<div class="empty">Nothing to schedule.</div>';
+}
+
+function renderPayables(vf,term){
+  const map=new Map();
+  state.signals.filter(s=>s.direction==='payable').forEach(s=>{
+    const key=(s.vendor||s.party||'—')+'|'+(s.order_ref||s.source_id);
+    if(!map.has(key)) map.set(key,{who:s.vendor||s.party||'—',ref:s.order_ref,events:[]});
+    map.get(key).events.push(s);
+  });
+  let bills=[...map.values()].map(b=>{
+    b.events.sort((a,c)=>new Date(a.occurred_at)-new Date(c.occurred_at));
+    const last=b.events[b.events.length-1];
+    b.status=last.status_step; b.date=last.occurred_at; b.subject=last.subject;
+    b.paid=b.events.some(e=>(e.status_step||'')==='paid');
+    b.docUrl=b.events.map(e=>e.doc_url).filter(Boolean).pop();
+    b.link=b.events.map(e=>(e.link&&e.link.indexOf('squareup.com')>-1)?e.link:null).filter(Boolean).pop();
+    return b;
+  });
+  if(vf) bills=bills.filter(b=>b.who===vf);
+  if(term) bills=bills.filter(b=>[b.who,b.subject,b.ref].filter(Boolean).join(' ').toLowerCase().includes(term));
+  bills.sort((a,b)=> (a.paid-b.paid) || (new Date(b.date)-new Date(a.date)));
+  $('#payables').innerHTML = bills.length ? bills.map(b=>`
+    <div class="acard bill${b.paid?' paid':''}">
+      <div class="v">${esc(b.who)}${b.paid?'<span class="pd">paid</span>':'<span class="due">to pay</span>'}</div>
+      <div class="s">${esc(b.subject||'')}</div>
+      <div class="m">${b.ref?'#'+esc(b.ref)+' · ':''}${timeAgo(b.date)} ago${b.docUrl?` · <button class="raildoc" data-modal="${esc(b.docUrl)}" data-label="${esc(b.who)} bill" onclick="event.stopPropagation()">📎 view</button>`:b.link?` · <a href="${esc(b.link)}" target="_blank" rel="noopener">open ↗</a>`:''}</div>
+    </div>`).join('') : '<div class="empty">Nothing to pay.</div>';
+}
+
+function renderAlerts(vf,term){
+  const on=t=>document.querySelector(t).getAttribute('aria-pressed')==='true';
+  let al=state.signals.filter(s=>(s.signal_type==='promotion'&&on('#togPromo'))||(s.signal_type==='discontinuation'&&on('#togDisc')));
+  if(vf) al=al.filter(s=>s.vendor===vf);
+  if(term) al=al.filter(s=>[s.vendor,s.subject].filter(Boolean).join(' ').toLowerCase().includes(term));
+  al.sort((a,b)=>new Date(b.occurred_at)-new Date(a.occurred_at));
+  $('#alerts').innerHTML = al.length ? al.map(s=>`
+    <a class="acard ${s.signal_type==='discontinuation'?'disc':''}" href="${s.link||'#'}" target="_blank" rel="noopener">
+      <div class="v">${esc(s.vendor||'—')}</div><div class="s">${esc(s.subject||'')}</div>
+      <div class="m">${s.signal_type==='discontinuation'?'Discontinuation':'Promotion'} · ${timeAgo(s.occurred_at)} ago</div>
+    </a>`).join('') : '<div class="empty">No vendor alerts.</div>';
+}
+
+// events
+$('#togPromo').onclick=e=>{e.target.setAttribute('aria-pressed',e.target.getAttribute('aria-pressed')==='true'?'false':'true');savePrefs();render();};
+$('#togDisc').onclick=e=>{e.target.setAttribute('aria-pressed',e.target.getAttribute('aria-pressed')==='true'?'false':'true');savePrefs();render();};
+$('#side').onchange=render; $('#vendorFilter').onchange=render; $('#search').oninput=render;
+$('#window').onchange=loadSignals; $('#refresh').onclick=()=>{ loadSignals(); loadBrief(); };
+
+// quick-view modal (Drive docs embed via /preview; Square pages fall back to "Open in new tab")
+const modal=$('#modal');
+function openModal(url,label){
+  if(!url) return;
+  let src=url; const m=url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  if(m) src='https://drive.google.com/file/d/'+m[1]+'/preview';
+  $('#modalFrame').src=src; $('#modalOpen').href=url; $('#modalTitle').textContent=label||'Document';
+  modal.classList.remove('hidden');
+}
+function closeModal(){ modal.classList.add('hidden'); $('#modalFrame').src='about:blank'; }
+$('#modalClose').onclick=closeModal;
+modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && !modal.classList.contains('hidden')) closeModal(); });
+
+// doc/invoice actions anywhere (orders list + rail): open in the modal; Supabase-storage docs get a signed URL first
+document.addEventListener('click', async e=>{
+  const mb=e.target.closest('[data-modal]');
+  if(mb){ e.stopPropagation(); openModal(mb.dataset.modal, mb.dataset.label); return; }
+  const b=e.target.closest('[data-doc]'); if(!b) return;
+  e.stopPropagation();
+  const path=b.dataset.doc, orig=b.textContent; b.textContent='opening…';
+  const { data, error } = await sb.storage.from('ops-docs').createSignedUrl(path, 120);
+  if(error||!data){ b.textContent='⚠ not available'; setTimeout(()=>b.textContent=orig,2500); return; }
+  openModal(data.signedUrl,'Document'); b.textContent=orig;
+});
+
+init();
+</script>
+</body>
+</html>

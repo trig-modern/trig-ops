@@ -1,3 +1,6 @@
 deploy-*.zip
 .DS_Store
 node_modules/
+
+printer/.env
+*.png

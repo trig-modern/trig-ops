@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <title>Trig Delivery — Receiving &amp; Routes</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
@@ -120,7 +120,7 @@
     .side{width:auto;flex:none;height:auto;position:sticky;top:0;z-index:10;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;border-right:none;border-bottom:1px solid var(--line);padding:10px 14px;backdrop-filter:none;-webkit-backdrop-filter:none;background:#fff}
     .side .brand{padding:0}
     /* tabs → fixed bottom nav bar (native-app style) */
-    .tabs{position:fixed;left:0;right:0;bottom:0;z-index:40;flex-direction:row;gap:0;background:rgba(255,255,255,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:7px 4px calc(7px + env(safe-area-inset-bottom));box-shadow:0 -4px 20px rgba(17,17,17,.06)}
+    .tabs{position:fixed;left:0;right:0;bottom:0;z-index:40;flex-direction:row;gap:0;background:rgba(255,255,255,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:11px 4px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -4px 20px rgba(17,17,17,.06)}
     .tab{position:relative;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:auto;border:0;background:none;border-radius:12px;padding:5px 2px;font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;box-shadow:none}
     .tab:hover{background:none;color:var(--muted)}
     .tab .ic{display:block;width:auto;font-size:21px;line-height:1}
@@ -130,8 +130,8 @@
     .sidefoot{flex-direction:row;margin:0;border:0;padding:0;gap:6px;flex:0 0 auto}
     .sidefoot .who,.sidefoot #setPw{display:none}
     .sidefoot .ghost{width:auto}
-    .content main{padding:16px 16px 88px}
-    .toast{bottom:92px}
+    .content main{padding:16px 16px calc(112px + env(safe-area-inset-bottom))}
+    .toast{bottom:calc(104px + env(safe-area-inset-bottom))}
   }
 </style>
 </head>

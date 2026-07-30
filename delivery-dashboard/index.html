@@ -221,31 +221,29 @@ function loadAll(){ loadReceiving(); loadRoutes(); loadTasks(); }
 
 // ---------- receiving ----------
 async function loadReceiving(){
-  // inbound = shipment-ish signals not yet marked received
-  const { data:sig } = await sb.from('ops_signals').select('*')
-    .in('status_step',['shipped','ready_to_ship','released'])
-    .order('occurred_at',{ascending:false}).limit(40);
-  const { data:rcv } = await sb.from('ops_receiving').select('signal_id').not('signal_id','is',null);
-  const done = new Set((rcv||[]).map(r=>r.signal_id));
-  const inbound = (sig||[]).filter(s=> !done.has(s.id));
+  // inbound = paid Square order lines not yet checked in (view self-excludes received lines)
+  const { data:inbound } = await sb.from('v_incoming_receiving').select('*').limit(80);
   const el = $('#inbound');
-  if(!inbound.length){ el.innerHTML = '<div class="empty">Nothing in transit right now. Check items in manually below as they arrive.</div>'; }
-  else el.innerHTML = inbound.map(s=>`
+  if(!inbound || !inbound.length){ el.innerHTML = '<div class="empty">Nothing arriving right now. Check items in manually below as they arrive.</div>'; }
+  else el.innerHTML = inbound.map(r=>`
     <div class="card">
       <div class="row">
-        <div>
-          <div class="title">${esc(s.vendor||s.product||s.subject||'Inbound shipment')}</div>
-          <div class="sub">${esc([s.product,s.sku&&('SKU '+s.sku),s.client&&('for '+s.client),s.order_ref&&('#'+s.order_ref)].filter(Boolean).join(' · ')||s.snippet||'')}</div>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          ${r.product_image?`<img src="${esc(r.product_image)}" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:8px;flex:none;background:#eee">`:''}
+          <div>
+            <div class="title">${esc(r.description||r.catalog_model||r.sku||'Item')} ${r.qty>1?`<span class="pill">×${r.qty}</span>`:''}</div>
+            <div class="sub">${esc([r.client_name&&('for '+r.client_name),r.sku&&('SKU '+r.sku),r.ordered_at&&('ordered '+new Date(r.ordered_at).toLocaleDateString([], {month:'short',day:'numeric'}))].filter(Boolean).join(' · '))}</div>
+          </div>
         </div>
-        <span class="pill blue">${esc((s.status_step||'').replace(/_/g,' '))}</span>
+        <span class="pill blue">paid</span>
       </div>
       <div class="acts">
-        <button class="mini go" data-in="${s.id}">✓ Receive</button>
-        <button class="mini warn" data-dmg="${s.id}">Receive — damaged</button>
+        <button class="mini go" data-in="${r.line_id}">✓ Receive</button>
+        <button class="mini warn" data-dmg="${r.line_id}">Receive — damaged</button>
       </div>
     </div>`).join('');
-  el.querySelectorAll('[data-in]').forEach(b=> b.onclick=()=>receiveSignal(inbound.find(x=>x.id==b.dataset.in),'good'));
-  el.querySelectorAll('[data-dmg]').forEach(b=> b.onclick=()=>receiveSignal(inbound.find(x=>x.id==b.dataset.dmg),'damaged'));
+  el.querySelectorAll('[data-in]').forEach(b=> b.onclick=()=>receiveLine(inbound.find(x=>x.line_id==b.dataset.in),'good'));
+  el.querySelectorAll('[data-dmg]').forEach(b=> b.onclick=()=>receiveLine(inbound.find(x=>x.line_id==b.dataset.dmg),'damaged'));
 
   // received today
   const start = new Date(); start.setHours(0,0,0,0);
@@ -260,11 +258,13 @@ async function loadReceiving(){
       <span class="pill ${r.condition==='good'?'green':(r.condition==='damaged'?'red':'amber')}">${esc(r.condition)}</span>
     </div></div>`).join('');
 }
-async function receiveSignal(s, condition){
-  if(!s) return;
+async function receiveLine(r, condition){
+  if(!r) return;
   const { error } = await sb.from('ops_receiving').insert({
-    received_by:state.email, source:'auto', signal_id:s.id, condition,
-    sku:s.sku, description:s.product||s.subject, vendor:s.vendor, order_ref:s.order_ref, client:s.client
+    received_by:state.email, source:'auto', condition,
+    sales_order_line_id:r.line_id, app_id:r.app_id,
+    sku:r.sku, description:r.description||r.catalog_model, qty:r.qty||1,
+    client:r.client_name, order_ref:r.square_order_id
   });
   if(error){ toast('Error: '+error.message); return; }
   toast(condition==='damaged'?'Received (flagged damaged)':'Received ✓'); loadReceiving();

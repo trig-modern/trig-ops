@@ -152,6 +152,7 @@
       <div class="brand"><span class="blogo" role="img" aria-label="trig"></span><span class="ste">delivery</span></div>
       <nav class="tabs">
         <button class="tab" data-tab="receiving" aria-selected="true"><span class="ic">📦</span><span>Receiving</span></button>
+        <button class="tab" data-tab="calendar" aria-selected="false"><span class="ic">📅</span><span>Calendar</span></button>
         <button class="tab" data-tab="routes" aria-selected="false"><span class="ic">🚚</span><span>Routes</span></button>
         <button class="tab" data-tab="tasks" aria-selected="false"><span class="ic">✅</span><span>My Tasks</span> <span id="taskBadge" class="badge hidden">0</span></button>
       </nav>
@@ -185,6 +186,11 @@
       </div>
       <div class="sec-h">Received today</div>
       <div id="received"></div>
+    </section>
+
+    <section id="tab-calendar" class="hidden">
+      <div class="pagehd"><h2>Calendar</h2><p>Deliveries scheduled &amp; orders expected in — next 4 weeks.</p></div>
+      <div id="calendar"></div>
     </section>
 
     <section id="tab-routes" class="hidden">
@@ -270,13 +276,15 @@ async function showApp(email){
 }
 
 // ---------- tabs ----------
-document.querySelectorAll('.tab').forEach(t=> t.onclick = ()=>{
-  state.tab = t.dataset.tab;
-  document.querySelectorAll('.tab').forEach(x=> x.setAttribute('aria-selected', x===t));
-  ['receiving','routes','tasks'].forEach(k=> $('#tab-'+k).classList.toggle('hidden', k!==state.tab));
-});
+const TABS = ['receiving','calendar','routes','tasks'];
+function selectTab(name){
+  state.tab = name;
+  document.querySelectorAll('.tab').forEach(x=> x.setAttribute('aria-selected', x.dataset.tab===name));
+  TABS.forEach(k=> $('#tab-'+k).classList.toggle('hidden', k!==name));
+}
+document.querySelectorAll('.tab').forEach(t=> t.onclick = ()=> selectTab(t.dataset.tab));
 
-function loadAll(){ loadReceiving(); loadRoutes(); loadTasks(); }
+function loadAll(){ loadReceiving(); loadCalendar(); loadRoutes(); loadTasks(); }
 
 // ---------- receiving ----------
 async function loadReceiving(){
@@ -388,7 +396,82 @@ async function updateStop(id, st){
   if(st==='delivered'){ patch.delivered_at=new Date().toISOString(); patch.delivered_by=state.email; }
   const { error } = await sb.from('ops_route_stops').update(patch).eq('id',id);
   if(error){ toast('Error: '+error.message); return; }
-  toast(st==='delivered'?'Delivered ✓':('Marked '+st)); loadRoutes();
+  toast(st==='delivered'?'Delivered ✓':('Marked '+st)); loadAll();
+}
+
+// ---------- calendar ----------
+function _stopCardCal(s){
+  const r = s.route||{};
+  const win = s.window_start ? (s.window_start + (s.window_end?'–'+s.window_end:'')) : '';
+  return `<div class="stop ${s.status==='delivered'?'delivered':''}">
+    <div class="row">
+      <div><div class="title">🚚 ${esc(s.client||'Stop')} ${win?`<span class="pill blue">${esc(win)}</span>`:''}</div>
+        <div class="sub">${esc([r.name,s.address,s.items,s.order_ref&&('#'+s.order_ref)].filter(Boolean).join(' · '))}</div></div>
+      <span class="pill ${s.status==='delivered'?'green':(s.status==='failed'?'red':(s.status==='loaded'?'amber':''))}">${esc(s.status)}</span>
+    </div>
+    <div class="acts">
+      <button class="mini" data-stop="${s.id}" data-st="loaded">Loaded</button>
+      <button class="mini go" data-stop="${s.id}" data-st="delivered">✓ Delivered</button>
+      <button class="mini warn" data-stop="${s.id}" data-st="failed">Failed</button>
+    </div></div>`;
+}
+function _eventCardCal(e){
+  const ic = {delivery:'🚚',staff:'👤',meeting:'👥',order:'🧾',special:'⭐'}[e.type] || '📌';
+  const col = {delivery:'orange',staff:'blue',order:'green',special:'amber'}[e.type] || '';
+  return `<div class="card"><div class="row">
+    <div><div class="title">${ic} ${esc(e.title||e.type)}</div>
+      ${e.time_label?`<div class="sub">${esc(e.time_label)}</div>`:''}</div>
+    <span class="pill ${col}">${esc(e.type||'event')}</span></div></div>`;
+}
+async function loadCalendar(){
+  const el = $('#calendar'); if(!el) return;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayStr = today.toISOString().slice(0,10);
+  const horizon = new Date(today); horizon.setDate(horizon.getDate()+28);
+  const horizonStr = horizon.toISOString().slice(0,10);
+
+  const [{ data:ev }, { data:routes }, { data:incoming }] = await Promise.all([
+    sb.from('calendar_events').select('*').neq('source','seed').eq('deleted',false)
+      .gte('event_date',todayStr).lte('event_date',horizonStr).order('event_date'),
+    sb.from('ops_delivery_routes').select('*')
+      .gte('route_date',todayStr).lte('route_date',horizonStr).order('route_date'),
+    sb.from('v_incoming_receiving').select('line_id,description,sku,client_name,qty').limit(200)
+  ]);
+  const routeById = {}; (routes||[]).forEach(r=> routeById[r.id]=r);
+  let stops = [];
+  const rids = (routes||[]).map(r=>r.id);
+  if(rids.length){ const { data } = await sb.from('ops_route_stops').select('*').in('route_id',rids).order('seq'); stops = data||[]; }
+
+  const days = {};
+  const day = d => (days[d] = days[d] || { events:[], stops:[] });
+  (ev||[]).forEach(e=> day(e.event_date).events.push(e));
+  (stops||[]).forEach(s=>{ const r=routeById[s.route_id]; if(r) day(r.route_date).stops.push({ ...s, route:r }); });
+
+  const inc = incoming||[];
+  let html = `<div class="card"><div class="row">
+      <div><div class="title">📥 Expected in <span class="pill amber">${inc.length}</span></div>
+        <div class="sub">Paid orders not yet received — no delivery date set</div></div>
+      <button class="mini" id="cal_to_recv">Receiving →</button></div>
+      ${inc.length?`<div class="sub" style="margin-top:8px;line-height:1.7">${inc.slice(0,8).map(i=>esc([i.description||i.sku||'item', i.client_name].filter(Boolean).join(' · '))).join('<br>')}${inc.length>8?`<br>+${inc.length-8} more…`:''}</div>`:''}
+    </div>`;
+
+  const dates = Object.keys(days).sort();
+  if(!dates.length){
+    html += '<div class="empty">Nothing scheduled in the next 4 weeks. Deliveries Ryan schedules (in the suite app or the Trig Ops Google calendar) will show up here.</div>';
+  } else {
+    html += dates.map(d=>{
+      const dd = new Date(d+'T00:00:00');
+      const isToday = d===todayStr;
+      const dstr = dd.toLocaleDateString([], {weekday:'long', month:'short', day:'numeric'});
+      const g = days[d];
+      return `<div class="sec-h" style="margin-top:18px">${isToday?'<span class="pill orange">Today</span> ':''}${esc(dstr)}</div>
+        ${g.stops.map(_stopCardCal).join('')}
+        ${g.events.map(_eventCardCal).join('')}`;
+    }).join('');
+  }
+  el.innerHTML = html;
+  el.querySelectorAll('[data-stop]').forEach(b=> b.onclick=()=> updateStop(b.dataset.stop, b.dataset.st));
+  const t = $('#cal_to_recv'); if(t) t.onclick = ()=> selectTab('receiving');
 }
 
 // ---------- tasks ----------

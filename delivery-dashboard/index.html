@@ -189,7 +189,22 @@
     </section>
 
     <section id="tab-calendar" class="hidden">
-      <div class="pagehd"><h2>Calendar</h2><p>Deliveries scheduled &amp; orders expected in — next 4 weeks.</p></div>
+      <style>
+        #tab-calendar .calnav{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+        #tab-calendar .wklabel{font-weight:800;font-size:15px;min-width:130px;text-align:center}
+        #tab-calendar .calday{display:flex;gap:12px;padding:12px 2px;border-top:1px solid var(--line)}
+        #tab-calendar .calday.istoday{background:color-mix(in srgb,var(--orange) 7%,transparent);border-top-color:transparent;border-radius:12px;padding:12px}
+        #tab-calendar .caldcol{flex:0 0 58px}
+        #tab-calendar .caldname{font-weight:800;font-size:13px}
+        #tab-calendar .caldnum{color:var(--muted);font-size:12px;margin-top:2px}
+        #tab-calendar .calevents{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
+        #tab-calendar .calevt{border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;background:var(--card)}
+        #tab-calendar .calevt .title{font-weight:700;font-size:14px}
+        #tab-calendar .calnotes{margin-top:8px;font-size:13px;white-space:pre-wrap;line-height:1.5}
+        #tab-calendar .calnoev{color:var(--muted);font-size:13px;padding:4px 0}
+        #tab-calendar .calmuted{color:var(--muted)}
+      </style>
+      <div class="pagehd"><h2>This week</h2><p>Deliveries, Mon–Sun. Tap one to see its notes.</p></div>
       <div id="calendar"></div>
     </section>
 
@@ -220,7 +235,7 @@ const TRIG_DOMAIN = '@trigmodern.com';
 
 const $ = s => document.querySelector(s);
 const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let state = { email:null, tab:'receiving' };
+let state = { email:null, tab:'receiving', weekOffset:0 };
 
 function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); }
 
@@ -399,79 +414,54 @@ async function updateStop(id, st){
   toast(st==='delivered'?'Delivered ✓':('Marked '+st)); loadAll();
 }
 
-// ---------- calendar ----------
-function _stopCardCal(s){
-  const r = s.route||{};
-  const win = s.window_start ? (s.window_start + (s.window_end?'–'+s.window_end:'')) : '';
-  return `<div class="stop ${s.status==='delivered'?'delivered':''}">
-    <div class="row">
-      <div><div class="title">🚚 ${esc(s.client||'Stop')} ${win?`<span class="pill blue">${esc(win)}</span>`:''}</div>
-        <div class="sub">${esc([r.name,s.address,s.items,s.order_ref&&('#'+s.order_ref)].filter(Boolean).join(' · '))}</div></div>
-      <span class="pill ${s.status==='delivered'?'green':(s.status==='failed'?'red':(s.status==='loaded'?'amber':''))}">${esc(s.status)}</span>
-    </div>
-    <div class="acts">
-      <button class="mini" data-stop="${s.id}" data-st="loaded">Loaded</button>
-      <button class="mini go" data-stop="${s.id}" data-st="delivered">✓ Delivered</button>
-      <button class="mini warn" data-stop="${s.id}" data-st="failed">Failed</button>
-    </div></div>`;
-}
-function _eventCardCal(e){
-  const ic = {delivery:'🚚',staff:'👤',meeting:'👥',order:'🧾',special:'⭐'}[e.type] || '📌';
-  const col = {delivery:'orange',staff:'blue',order:'green',special:'amber'}[e.type] || '';
-  return `<div class="card"><div class="row">
-    <div><div class="title">${ic} ${esc(e.title||e.type)}</div>
-      ${e.time_label?`<div class="sub">${esc(e.time_label)}</div>`:''}</div>
-    <span class="pill ${col}">${esc(e.type||'event')}</span></div></div>`;
+// ---------- calendar (vertical Mon–Sun week, deliveries synced from Google) ----------
+const _ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+function _mondayOf(offset){
+  const d = new Date(); d.setHours(0,0,0,0);
+  const dow = (d.getDay()+6)%7;                 // 0 = Monday
+  d.setDate(d.getDate() - dow + offset*7);
+  return d;
 }
 async function loadCalendar(){
   const el = $('#calendar'); if(!el) return;
-  const today = new Date(); today.setHours(0,0,0,0);
-  const todayStr = today.toISOString().slice(0,10);
-  const horizon = new Date(today); horizon.setDate(horizon.getDate()+28);
-  const horizonStr = horizon.toISOString().slice(0,10);
+  const mon = _mondayOf(state.weekOffset||0);
+  const sun = new Date(mon); sun.setDate(sun.getDate()+6);
+  const monStr = _ymd(mon), sunStr = _ymd(sun), todayStr = _ymd(new Date());
 
-  const [{ data:ev }, { data:routes }, { data:incoming }] = await Promise.all([
-    sb.from('calendar_events').select('*').neq('source','seed').eq('deleted',false)
-      .gte('event_date',todayStr).lte('event_date',horizonStr).order('event_date'),
-    sb.from('ops_delivery_routes').select('*')
-      .gte('route_date',todayStr).lte('route_date',horizonStr).order('route_date'),
-    sb.from('v_incoming_receiving').select('line_id,description,sku,client_name,qty').limit(200)
-  ]);
-  const routeById = {}; (routes||[]).forEach(r=> routeById[r.id]=r);
-  let stops = [];
-  const rids = (routes||[]).map(r=>r.id);
-  if(rids.length){ const { data } = await sb.from('ops_route_stops').select('*').in('route_id',rids).order('seq'); stops = data||[]; }
+  const { data:ev } = await sb.from('calendar_events').select('*')
+    .eq('type','delivery').eq('deleted',false).neq('source','seed')
+    .gte('event_date',monStr).lte('event_date',sunStr).order('event_date');
+  const byDate = {}; (ev||[]).forEach(e=> (byDate[e.event_date]=byDate[e.event_date]||[]).push(e));
 
-  const days = {};
-  const day = d => (days[d] = days[d] || { events:[], stops:[] });
-  (ev||[]).forEach(e=> day(e.event_date).events.push(e));
-  (stops||[]).forEach(s=>{ const r=routeById[s.route_id]; if(r) day(r.route_date).stops.push({ ...s, route:r }); });
-
-  const inc = incoming||[];
-  let html = `<div class="card"><div class="row">
-      <div><div class="title">📥 Expected in <span class="pill amber">${inc.length}</span></div>
-        <div class="sub">Paid orders not yet received — no delivery date set</div></div>
-      <button class="mini" id="cal_to_recv">Receiving →</button></div>
-      ${inc.length?`<div class="sub" style="margin-top:8px;line-height:1.7">${inc.slice(0,8).map(i=>esc([i.description||i.sku||'item', i.client_name].filter(Boolean).join(' · '))).join('<br>')}${inc.length>8?`<br>+${inc.length-8} more…`:''}</div>`:''}
+  const fmt = (d,o)=> d.toLocaleDateString([], o);
+  let html = `<div class="calnav">
+      <button class="mini" id="wk_prev">‹ Prev</button>
+      <div class="wklabel">${fmt(mon,{month:'short',day:'numeric'})} – ${fmt(sun,{month:'short',day:'numeric'})}</div>
+      <button class="mini" id="wk_next">Next ›</button>
+      ${state.weekOffset ? '<button class="mini go" id="wk_today">This week</button>' : ''}
     </div>`;
-
-  const dates = Object.keys(days).sort();
-  if(!dates.length){
-    html += '<div class="empty">Nothing scheduled in the next 4 weeks. Deliveries Ryan schedules (in the suite app or the Trig Ops Google calendar) will show up here.</div>';
-  } else {
-    html += dates.map(d=>{
-      const dd = new Date(d+'T00:00:00');
-      const isToday = d===todayStr;
-      const dstr = dd.toLocaleDateString([], {weekday:'long', month:'short', day:'numeric'});
-      const g = days[d];
-      return `<div class="sec-h" style="margin-top:18px">${isToday?'<span class="pill orange">Today</span> ':''}${esc(dstr)}</div>
-        ${g.stops.map(_stopCardCal).join('')}
-        ${g.events.map(_eventCardCal).join('')}`;
-    }).join('');
+  for(let i=0;i<7;i++){
+    const d = new Date(mon); d.setDate(d.getDate()+i);
+    const ds = _ymd(d);
+    const list = byDate[ds] || [];
+    html += `<div class="calday ${ds===todayStr?'istoday':''}">
+      <div class="caldcol"><div class="caldname">${fmt(d,{weekday:'short'})}</div><div class="caldnum">${fmt(d,{month:'short',day:'numeric'})}</div></div>
+      <div class="calevents">
+        ${list.length ? list.map(e=>`
+          <div class="calevt" data-ev="${e.id}">
+            <div class="row"><div class="title">🚚 ${esc(e.title||'Delivery')}</div>${e.time_label?`<span class="pill blue">${esc(e.time_label)}</span>`:''}</div>
+            <div class="calnotes hidden" id="n_${e.id}">${e.notes ? esc(e.notes) : '<span class="calmuted">No notes.</span>'}</div>
+          </div>`).join('')
+        : '<div class="calnoev">—</div>'}
+      </div>
+    </div>`;
   }
   el.innerHTML = html;
-  el.querySelectorAll('[data-stop]').forEach(b=> b.onclick=()=> updateStop(b.dataset.stop, b.dataset.st));
-  const t = $('#cal_to_recv'); if(t) t.onclick = ()=> selectTab('receiving');
+  el.querySelectorAll('.calevt').forEach(c=> c.onclick=()=>{ const n=$('#n_'+c.dataset.ev); if(n) n.classList.toggle('hidden'); });
+  const p=$('#wk_prev'), nx=$('#wk_next'), tdy=$('#wk_today');
+  if(p) p.onclick=()=>{ state.weekOffset=(state.weekOffset||0)-1; loadCalendar(); };
+  if(nx) nx.onclick=()=>{ state.weekOffset=(state.weekOffset||0)+1; loadCalendar(); };
+  if(tdy) tdy.onclick=()=>{ state.weekOffset=0; loadCalendar(); };
 }
 
 // ---------- tasks ----------

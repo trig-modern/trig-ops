@@ -114,8 +114,10 @@
   .content main{padding:24px 26px 60px}
   @media(max-width:820px){
     .shell{flex-direction:column}
-    /* top bar: brand left, utilities right */
-    .side{width:auto;flex:none;height:auto;position:sticky;top:0;z-index:10;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;border-right:none;border-bottom:1px solid var(--line);padding:10px 14px}
+    /* top bar: brand left, utilities right. NB: backdrop-filter must be none here —
+       any filter/backdrop-filter on an ancestor makes it the containing block for the
+       fixed bottom nav, which would pin the bar to this bar's bottom instead of the viewport. */
+    .side{width:auto;flex:none;height:auto;position:sticky;top:0;z-index:10;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;border-right:none;border-bottom:1px solid var(--line);padding:10px 14px;backdrop-filter:none;-webkit-backdrop-filter:none;background:#fff}
     .side .brand{padding:0}
     /* tabs → fixed bottom nav bar (native-app style) */
     .tabs{position:fixed;left:0;right:0;bottom:0;z-index:40;flex-direction:row;gap:0;background:rgba(255,255,255,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:7px 4px calc(7px + env(safe-area-inset-bottom));box-shadow:0 -4px 20px rgba(17,17,17,.06)}

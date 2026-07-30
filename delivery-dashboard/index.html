@@ -120,7 +120,7 @@
     .side{width:auto;flex:none;height:auto;position:sticky;top:0;z-index:10;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;border-right:none;border-bottom:1px solid var(--line);padding:10px 14px;backdrop-filter:none;-webkit-backdrop-filter:none;background:#fff}
     .side .brand{padding:0}
     /* tabs → fixed bottom nav bar (native-app style) */
-    .tabs{position:fixed;left:0;right:0;bottom:0;z-index:40;flex-direction:row;gap:0;background:rgba(255,255,255,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:11px 4px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -4px 20px rgba(17,17,17,.06)}
+    .tabs{position:fixed;left:0;right:0;bottom:0;z-index:40;flex-direction:row;gap:0;background:rgba(255,255,255,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:7px 4px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 20px rgba(17,17,17,.06)}
     .tab{position:relative;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:auto;border:0;background:none;border-radius:12px;padding:5px 2px;font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;box-shadow:none}
     .tab:hover{background:none;color:var(--muted)}
     .tab .ic{display:block;width:auto;font-size:21px;line-height:1}
@@ -130,8 +130,8 @@
     .sidefoot{flex-direction:row;margin:0;border:0;padding:0;gap:6px;flex:0 0 auto}
     .sidefoot .who,.sidefoot #setPw{display:none}
     .sidefoot .ghost{width:auto}
-    .content main{padding:16px 16px calc(112px + env(safe-area-inset-bottom))}
-    .toast{bottom:calc(104px + env(safe-area-inset-bottom))}
+    .content main{padding:16px 16px calc(88px + env(safe-area-inset-bottom))}
+    .toast{bottom:calc(84px + env(safe-area-inset-bottom))}
   }
 </style>
 </head>
@@ -231,6 +231,61 @@
   </div>
 </div>
 
+<style>
+  .recvcard{cursor:pointer}
+  .recvcard .title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .recvthumb{width:52px;height:52px;object-fit:cover;border-radius:8px;flex:none;background:#eee}
+  .min0{min-width:0}
+  .tapnote{color:var(--orange);font-weight:700;margin-top:8px;font-size:12.5px}
+  .rmodal{position:fixed;inset:0;z-index:100;background:rgba(17,17,17,.45);display:flex;align-items:flex-end;justify-content:center}
+  .rmodal.hidden{display:none}
+  .rsheet{background:#fff;width:100%;max-width:520px;max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 18px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -10px 40px rgba(0,0,0,.22)}
+  @media(min-width:560px){.rmodal{align-items:center}.rsheet{border-radius:20px}}
+  .rhead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px}
+  .rtitle{font-family:var(--gg,inherit);font-weight:800;font-size:21px;line-height:1.15}
+  .rsub{color:var(--muted);font-size:13px;margin-top:3px;font-weight:600}
+  .rx{flex:none;font-size:16px}
+  .ritem{border:1px solid var(--line);border-radius:12px;padding:11px 12px;font-size:13.5px;color:var(--ink);margin-bottom:16px;white-space:pre-wrap;display:flex;gap:10px;align-items:flex-start}
+  .rlab{font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin:0 2px 7px}
+  .baygrid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  .bay{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 15px;font-family:inherit;font-size:14px;font-weight:700;color:var(--ink);cursor:pointer}
+  .bay.sel{background:var(--orange);border-color:var(--orange);color:#fff}
+  #rm_notes{margin-bottom:16px}
+  .photorow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+  .photorow img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+  .photobtn{margin-bottom:18px}
+  .racts{display:flex;gap:10px}
+  .racts .mini{flex:1;justify-content:center;padding:13px;font-size:15px;border-radius:12px}
+</style>
+
+<div id="recvModal" class="rmodal hidden">
+  <div class="rsheet">
+    <div class="rhead">
+      <div class="min0"><div id="rm_client" class="rtitle"></div><div id="rm_po" class="rsub"></div></div>
+      <button id="rm_close" class="ghost rx">✕</button>
+    </div>
+    <div id="rm_item" class="ritem"></div>
+    <div class="rlab">Storage location</div>
+    <div id="rm_bays" class="baygrid">
+      <button type="button" class="bay" data-bay="Cage 1">Cage 1</button>
+      <button type="button" class="bay" data-bay="Cage 2">Cage 2</button>
+      <button type="button" class="bay" data-bay="Cage 3">Cage 3</button>
+      <button type="button" class="bay" data-bay="Storage">Storage</button>
+      <button type="button" class="bay" data-bay="Floor">Floor</button>
+    </div>
+    <div class="rlab">Notes</div>
+    <textarea id="rm_notes" class="in" rows="2" placeholder="Condition, damage, missing pieces…"></textarea>
+    <div class="rlab">Photos</div>
+    <div id="rm_photos" class="photorow"></div>
+    <input id="rm_file" type="file" accept="image/*" capture="environment" multiple hidden>
+    <button type="button" id="rm_addphoto" class="mini photobtn">＋ Add photo</button>
+    <div class="racts">
+      <button type="button" id="rm_deny" class="mini warn">Deny</button>
+      <button type="button" id="rm_receive" class="mini go">✓ Receive</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script type="module">
@@ -309,30 +364,27 @@ document.querySelectorAll('.tab').forEach(t=> t.onclick = ()=> selectTab(t.datas
 function loadAll(){ loadReceiving(); loadCalendar(); loadRoutes(); loadTasks(); }
 
 // ---------- receiving ----------
+const poLabel = r => r.invoice_no ? ('Inv '+r.invoice_no) : (r.square_order_id ? ('PO '+String(r.square_order_id).slice(-6).toUpperCase()) : 'No PO#');
+const shortDesc = r => { const d=(r.description||r.catalog_model||r.sku||'Item').replace(/\s+/g,' ').trim(); return d.length>58?d.slice(0,58)+'…':d; };
+const photoCount = r => { const n=Array.isArray(r.qc_photos)?r.qc_photos.length:0; return n?(' · 📷 '+n):''; };
+
 async function loadReceiving(){
   // inbound = paid Square order lines not yet checked in (view self-excludes received lines)
   const { data:inbound } = await sb.from('v_incoming_receiving').select('*').limit(80);
   const el = $('#inbound');
   if(!inbound || !inbound.length){ el.innerHTML = '<div class="empty">Nothing arriving right now. Check items in manually below as they arrive.</div>'; }
   else el.innerHTML = inbound.map(r=>`
-    <div class="card">
+    <div class="card recvcard" data-open="${r.line_id}">
       <div class="row">
-        <div style="display:flex;gap:10px;align-items:flex-start">
-          ${r.product_image?`<img src="${esc(r.product_image)}" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:8px;flex:none;background:#eee">`:''}
-          <div>
-            <div class="title">${esc(r.description||r.catalog_model||r.sku||'Item')} ${r.qty>1?`<span class="pill">×${r.qty}</span>`:''}</div>
-            <div class="sub">${esc([r.client_name&&('for '+r.client_name),r.sku&&('SKU '+r.sku),r.ordered_at&&('ordered '+new Date(r.ordered_at).toLocaleDateString([], {month:'short',day:'numeric'}))].filter(Boolean).join(' · '))}</div>
-          </div>
+        <div class="min0">
+          <div class="title">${esc(r.client_name||'—')}</div>
+          <div class="sub"><b>${esc(poLabel(r))}</b> · ${r.qty>1?('×'+r.qty+' · '):''}${esc(shortDesc(r))}</div>
         </div>
-        <span class="pill blue">paid</span>
+        ${r.product_image?`<img src="${esc(r.product_image)}" alt="" class="recvthumb">`:'<span class="pill blue">paid</span>'}
       </div>
-      <div class="acts">
-        <button class="mini go" data-in="${r.line_id}">✓ Receive</button>
-        <button class="mini warn" data-dmg="${r.line_id}">Receive — damaged</button>
-      </div>
+      <div class="tapnote">Tap to check in →</div>
     </div>`).join('');
-  el.querySelectorAll('[data-in]').forEach(b=> b.onclick=()=>receiveLine(inbound.find(x=>x.line_id==b.dataset.in),'good'));
-  el.querySelectorAll('[data-dmg]').forEach(b=> b.onclick=()=>receiveLine(inbound.find(x=>x.line_id==b.dataset.dmg),'damaged'));
+  el.querySelectorAll('[data-open]').forEach(c=> c.onclick=()=> openRecv(inbound.find(x=>x.line_id==c.dataset.open)));
 
   // received today
   const start = new Date(); start.setHours(0,0,0,0);
@@ -341,22 +393,42 @@ async function loadReceiving(){
   if(!today || !today.length){ rel.innerHTML = '<div class="empty">Nothing checked in yet today.</div>'; }
   else rel.innerHTML = today.map(r=>`
     <div class="card"><div class="row">
-      <div><div class="title">${esc(r.description||r.sku||'Item')} ${r.qty>1?`<span class="pill">×${r.qty}</span>`:''}</div>
-        <div class="sub">${esc([r.vendor,r.sku&&('SKU '+r.sku),r.order_ref&&('#'+r.order_ref),r.notes].filter(Boolean).join(' · '))}</div>
-        <div class="sub">by ${esc((r.received_by||'').split('@')[0])} · ${new Date(r.received_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</div></div>
-      <span class="pill ${r.condition==='good'?'green':(r.condition==='damaged'?'red':'amber')}">${esc(r.condition)}</span>
+      <div class="min0"><div class="title">${esc(r.client||r.description||r.sku||'Item')} ${r.qty>1?`<span class="pill">×${r.qty}</span>`:''}</div>
+        <div class="sub">${esc([r.order_ref&&('#'+r.order_ref), r.storage_location&&('→ '+r.storage_location), r.notes].filter(Boolean).join(' · '))}</div>
+        <div class="sub">by ${esc((r.received_by||'').split('@')[0])} · ${new Date(r.received_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}${photoCount(r)}</div></div>
+      <span class="pill ${r.status==='denied'?'red':(r.condition==='good'?'green':(r.condition==='damaged'?'red':'amber'))}">${esc(r.status==='denied'?'denied':r.condition)}</span>
     </div></div>`).join('');
 }
-async function receiveLine(r, condition){
+
+// ---- receiving detail sheet ----
+let recv = { r:null, bay:null, photos:[] };
+function openRecv(r){
   if(!r) return;
+  recv = { r, bay:null, photos:[] };
+  $('#rm_client').textContent = r.client_name || '—';
+  $('#rm_po').textContent = [poLabel(r), r.ordered_at?('ordered '+new Date(r.ordered_at).toLocaleDateString([], {month:'short',day:'numeric'})):''].filter(Boolean).join(' · ');
+  $('#rm_item').innerHTML = `${r.product_image?`<img src="${esc(r.product_image)}" class="recvthumb">`:''}<div class="min0">${esc(r.description||r.catalog_model||'Item')}${r.sku?`<div class="sub">SKU ${esc(r.sku)}</div>`:''}${r.qty>1?`<div class="sub">Qty ${r.qty}</div>`:''}</div>`;
+  $('#rm_notes').value=''; $('#rm_photos').innerHTML='';
+  $('#rm_bays').querySelectorAll('.bay').forEach(b=>b.classList.remove('sel'));
+  $('#recvModal').classList.remove('hidden');
+}
+function closeRecv(){ $('#recvModal').classList.add('hidden'); recv={ r:null, bay:null, photos:[] }; }
+async function commitRecv(status, condition){
+  const r=recv.r; if(!r) return;
+  const bay=recv.bay;
+  if(status==='received' && !bay){ toast('Pick a storage location'); return; }
   const { error } = await sb.from('ops_receiving').insert({
-    received_by:state.email, source:'auto', condition,
+    received_by:state.email, source:'auto', status, condition,
     sales_order_line_id:r.line_id, app_id:r.app_id,
     sku:r.sku, description:r.description||r.catalog_model, qty:r.qty||1,
-    client:r.client_name, order_ref:r.square_order_id
+    client:r.client_name, order_ref:r.invoice_no||r.square_order_id,
+    storage_location: status==='received'? bay : null,
+    notes: ($('#rm_notes').value.trim()||null),
+    qc_photos: recv.photos
   });
   if(error){ toast('Error: '+error.message); return; }
-  toast(condition==='damaged'?'Received (flagged damaged)':'Received ✓'); loadReceiving();
+  closeRecv();
+  toast(status==='denied'?'Denied ✕':('Received → '+bay)); loadReceiving();
 }
 $('#m_checkin').onclick = async ()=>{
   const desc=$('#m_desc').value.trim(), sku=$('#m_sku').value.trim();
@@ -371,6 +443,26 @@ $('#m_checkin').onclick = async ()=>{
   ['m_sku','m_vendor','m_desc','m_ref','m_notes'].forEach(id=>$('#'+id).value=''); $('#m_qty').value='1'; $('#m_cond').value='good';
   toast('Checked in ✓'); loadReceiving();
 };
+
+// receiving sheet bindings
+$('#rm_close').onclick = closeRecv;
+$('#recvModal').onclick = e=>{ if(e.target.id==='recvModal') closeRecv(); };
+$('#rm_bays').querySelectorAll('.bay').forEach(b=> b.onclick=()=>{ recv.bay=b.dataset.bay; $('#rm_bays').querySelectorAll('.bay').forEach(x=>x.classList.toggle('sel', x===b)); });
+$('#rm_addphoto').onclick = ()=> $('#rm_file').click();
+$('#rm_file').onchange = async e=>{
+  const files=[...e.target.files]; e.target.value='';
+  for(const f of files){
+    if(!recv.r) break;
+    const path=`${recv.r.line_id}/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+    const { error } = await sb.storage.from('receiving-photos').upload(path, f, { contentType:f.type||'image/jpeg' });
+    if(error){ toast('Upload failed: '+error.message); continue; }
+    recv.photos.push(path);
+    const { data:signed } = await sb.storage.from('receiving-photos').createSignedUrl(path, 3600);
+    const img=document.createElement('img'); img.src=(signed&&signed.signedUrl)||''; $('#rm_photos').appendChild(img);
+  }
+};
+$('#rm_receive').onclick = ()=> commitRecv('received','good');
+$('#rm_deny').onclick = ()=> commitRecv('denied','denied');
 
 // ---------- routes ----------
 async function loadRoutes(){

@@ -201,18 +201,23 @@
 
     <section id="tab-calendar" class="hidden">
       <style>
-        #tab-calendar .calnav{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-        #tab-calendar .wklabel{font-weight:800;font-size:15px;min-width:130px;text-align:center}
-        #tab-calendar .calday{display:flex;gap:12px;padding:12px 2px;border-top:1px solid var(--line)}
-        #tab-calendar .calday.istoday{background:color-mix(in srgb,var(--orange) 7%,transparent);border-top-color:transparent;border-radius:12px;padding:12px}
-        #tab-calendar .caldcol{flex:0 0 58px}
-        #tab-calendar .caldname{font-weight:800;font-size:13px}
-        #tab-calendar .caldnum{color:var(--muted);font-size:12px;margin-top:2px}
-        #tab-calendar .calevents{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
-        #tab-calendar .calevt{border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;background:var(--card)}
+        #tab-calendar .calpanel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:2px 16px 8px}
+        #tab-calendar .calnav{display:flex;align-items:center;gap:8px;padding:14px 0 12px;border-bottom:1px solid var(--line)}
+        #tab-calendar .wklabel{font-family:var(--gg,inherit);font-weight:800;font-size:16px;text-align:center;flex:1}
+        #tab-calendar .calnav .mini{flex:none}
+        #tab-calendar .calday{display:flex;gap:14px;padding:13px 2px;border-top:1px solid var(--line)}
+        #tab-calendar .calday:first-of-type{border-top:none}
+        #tab-calendar .calday.istoday{background:color-mix(in srgb,var(--orange) 6%,transparent);border-radius:12px;padding:13px 12px;border-top-color:transparent}
+        #tab-calendar .calday.istoday + .calday{border-top-color:transparent}
+        #tab-calendar .caldcol{flex:0 0 42px;text-align:center;padding-top:2px}
+        #tab-calendar .caldname{font:800 11px/1 var(--gg,inherit);text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+        #tab-calendar .caldnum{font-family:var(--gg,inherit);font-weight:800;font-size:18px;margin-top:4px}
+        #tab-calendar .calday.istoday .caldnum{color:var(--orange)}
+        #tab-calendar .calevents{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0;justify-content:center}
+        #tab-calendar .calevt{border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;background:#fff}
         #tab-calendar .calevt .title{font-weight:700;font-size:14px}
         #tab-calendar .calnotes{margin-top:8px;font-size:13px;white-space:pre-wrap;line-height:1.5}
-        #tab-calendar .calnoev{color:var(--muted);font-size:13px;padding:4px 0}
+        #tab-calendar .calnoev{color:var(--muted);font-size:13px;padding:6px 0}
         #tab-calendar .calmuted{color:var(--muted)}
       </style>
       <div class="pagehd"><h2>This week</h2><p>Deliveries, Mon–Sun. Tap one to see its notes.</p></div>
@@ -275,6 +280,7 @@
       <button type="button" class="bay" data-bay="Cage 2">Cage 2</button>
       <button type="button" class="bay" data-bay="Cage 3">Cage 3</button>
       <button type="button" class="bay" data-bay="Storage">Storage</button>
+      <button type="button" class="bay" data-bay="Pallet">Pallet</button>
       <button type="button" class="bay" data-bay="Floor">Floor</button>
     </div>
     <div class="rlab">Notes</div>
@@ -286,6 +292,25 @@
     <div class="racts">
       <button type="button" id="rm_deny" class="mini warn">Deny</button>
       <button type="button" id="rm_receive" class="mini go">✓ Receive</button>
+    </div>
+  </div>
+</div>
+
+<div id="podModal" class="rmodal hidden">
+  <div class="rsheet">
+    <div class="rhead">
+      <div class="min0"><div id="pod_client" class="rtitle"></div><div id="pod_sub" class="rsub"></div></div>
+      <button id="pod_close" class="ghost rx">✕</button>
+    </div>
+    <div class="rlab">Delivery photos</div>
+    <div id="pod_photos" class="photorow"></div>
+    <input id="pod_file" type="file" accept="image/*" capture="environment" multiple hidden>
+    <button type="button" id="pod_addphoto" class="mini photobtn">＋ Add photo</button>
+    <div class="rlab">Note</div>
+    <textarea id="pod_note" class="in" rows="2" placeholder="Left with client, placement, signature…"></textarea>
+    <div class="racts">
+      <button type="button" id="pod_cancel" class="mini">Cancel</button>
+      <button type="button" id="pod_confirm" class="mini go">✓ Confirm delivered</button>
     </div>
   </div>
 </div>
@@ -468,6 +493,25 @@ $('#rm_file').onchange = async e=>{
 $('#rm_receive').onclick = ()=> commitRecv('received','good');
 $('#rm_deny').onclick = ()=> commitRecv('denied','denied');
 
+// proof-of-delivery sheet bindings
+$('#pod_close').onclick = closePod;
+$('#pod_cancel').onclick = closePod;
+$('#podModal').onclick = e=>{ if(e.target.id==='podModal') closePod(); };
+$('#pod_addphoto').onclick = ()=> $('#pod_file').click();
+$('#pod_file').onchange = async e=>{
+  const files=[...e.target.files]; e.target.value='';
+  for(const f of files){
+    if(!pod.stop) break;
+    const path=`${pod.stop.id}/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+    const { error } = await sb.storage.from('delivery-photos').upload(path, f, { contentType:f.type||'image/jpeg' });
+    if(error){ toast('Upload failed: '+error.message); continue; }
+    pod.photos.push(path);
+    const { data:signed } = await sb.storage.from('delivery-photos').createSignedUrl(path, 3600);
+    const img=document.createElement('img'); img.src=(signed&&signed.signedUrl)||''; $('#pod_photos').appendChild(img);
+  }
+};
+$('#pod_confirm').onclick = commitPod;
+
 // ---------- routes ----------
 async function loadRoutes(){
   const today = new Date(); today.setHours(0,0,0,0);
@@ -478,6 +522,7 @@ async function loadRoutes(){
   const ids = routes.map(r=>r.id);
   const { data:stops } = await sb.from('ops_route_stops').select('*').in('route_id',ids).order('seq');
   const byRoute = {}; (stops||[]).forEach(s=> (byRoute[s.route_id]=byRoute[s.route_id]||[]).push(s));
+  const stopById = {}; (stops||[]).forEach(s=> stopById[s.id]=s);
   el.innerHTML = routes.map(r=>{
     const ss = byRoute[r.id]||[];
     const del = ss.filter(s=>s.status==='delivered').length;
@@ -496,7 +541,8 @@ async function loadRoutes(){
           <div class="row">
             <div><div class="title"><span class="seqdot">${s.seq}</span>${esc(s.client||'Stop')}</div>
               <div class="sub">${esc([s.address,(s.window_start&&(s.window_start+(s.window_end?'–'+s.window_end:''))),s.items,s.order_ref&&('#'+s.order_ref),s.phone].filter(Boolean).join(' · '))}</div>
-              ${s.notes?`<div class="sub">📝 ${esc(s.notes)}</div>`:''}</div>
+              ${s.notes?`<div class="sub">📝 ${esc(s.notes)}</div>`:''}
+              ${(Array.isArray(s.pod_photos)&&s.pod_photos.length)?`<div class="sub">📷 ${s.pod_photos.length} photo${s.pod_photos.length>1?'s':''}${s.delivered_by?(' · by '+esc(s.delivered_by.split('@')[0])):''}${s.pod_note?(' · '+esc(s.pod_note)):''}</div>`:''}</div>
             <span class="pill ${s.status==='delivered'?'green':(s.status==='failed'?'red':(s.status==='loaded'?'amber':''))}">${esc(s.status)}</span>
           </div>
           <div class="acts">
@@ -507,7 +553,10 @@ async function loadRoutes(){
         </div>`).join('')}
     </div>`;
   }).join('');
-  el.querySelectorAll('[data-stop]').forEach(b=> b.onclick=()=>updateStop(b.dataset.stop, b.dataset.st));
+  el.querySelectorAll('[data-stop]').forEach(b=> b.onclick=()=>{
+    if(b.dataset.st==='delivered'){ openPod(stopById[b.dataset.stop]); }
+    else updateStop(b.dataset.stop, b.dataset.st);
+  });
 }
 async function updateStop(id, st){
   const patch = { status:st };
@@ -515,6 +564,27 @@ async function updateStop(id, st){
   const { error } = await sb.from('ops_route_stops').update(patch).eq('id',id);
   if(error){ toast('Error: '+error.message); return; }
   toast(st==='delivered'?'Delivered ✓':('Marked '+st)); loadAll();
+}
+
+// ---- proof-of-delivery sheet ----
+let pod = { stop:null, photos:[] };
+function openPod(s){
+  if(!s) return;
+  pod = { stop:s, photos:[] };
+  $('#pod_client').textContent = s.client || 'Stop';
+  $('#pod_sub').textContent = [s.address, s.items, s.order_ref&&('#'+s.order_ref)].filter(Boolean).join(' · ');
+  $('#pod_photos').innerHTML=''; $('#pod_note').value='';
+  $('#podModal').classList.remove('hidden');
+}
+function closePod(){ $('#podModal').classList.add('hidden'); pod={ stop:null, photos:[] }; }
+async function commitPod(){
+  const s=pod.stop; if(!s) return;
+  const { error } = await sb.from('ops_route_stops').update({
+    status:'delivered', delivered_at:new Date().toISOString(), delivered_by:state.email,
+    pod_photos: pod.photos, pod_note: ($('#pod_note').value.trim()||null)
+  }).eq('id', s.id);
+  if(error){ toast('Error: '+error.message); return; }
+  closePod(); toast('Delivered ✓'); loadAll();
 }
 
 // ---------- calendar (vertical Mon–Sun week, deliveries synced from Google) ----------
@@ -537,18 +607,18 @@ async function loadCalendar(){
   const byDate = {}; (ev||[]).forEach(e=> (byDate[e.event_date]=byDate[e.event_date]||[]).push(e));
 
   const fmt = (d,o)=> d.toLocaleDateString([], o);
-  let html = `<div class="calnav">
-      <button class="mini" id="wk_prev">‹ Prev</button>
+  let html = `<div class="calpanel"><div class="calnav">
+      <button class="mini" id="wk_prev">‹</button>
       <div class="wklabel">${fmt(mon,{month:'short',day:'numeric'})} – ${fmt(sun,{month:'short',day:'numeric'})}</div>
-      <button class="mini" id="wk_next">Next ›</button>
-      ${state.weekOffset ? '<button class="mini go" id="wk_today">This week</button>' : ''}
+      <button class="mini" id="wk_next">›</button>
+      ${state.weekOffset ? '<button class="mini go" id="wk_today">Today</button>' : ''}
     </div>`;
   for(let i=0;i<7;i++){
     const d = new Date(mon); d.setDate(d.getDate()+i);
     const ds = _ymd(d);
     const list = byDate[ds] || [];
     html += `<div class="calday ${ds===todayStr?'istoday':''}">
-      <div class="caldcol"><div class="caldname">${fmt(d,{weekday:'short'})}</div><div class="caldnum">${fmt(d,{month:'short',day:'numeric'})}</div></div>
+      <div class="caldcol"><div class="caldname">${fmt(d,{weekday:'short'})}</div><div class="caldnum">${d.getDate()}</div></div>
       <div class="calevents">
         ${list.length ? list.map(e=>`
           <div class="calevt" data-ev="${e.id}">
@@ -559,6 +629,7 @@ async function loadCalendar(){
       </div>
     </div>`;
   }
+  html += `</div>`;
   el.innerHTML = html;
   el.querySelectorAll('.calevt').forEach(c=> c.onclick=()=>{ const n=$('#n_'+c.dataset.ev); if(n) n.classList.toggle('hidden'); });
   const p=$('#wk_prev'), nx=$('#wk_next'), tdy=$('#wk_today');

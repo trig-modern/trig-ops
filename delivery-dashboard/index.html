@@ -399,7 +399,7 @@ const photoCount = r => { const n=Array.isArray(r.qc_photos)?r.qc_photos.length:
 
 async function loadReceiving(){
   // inbound = paid Square order lines not yet checked in (view self-excludes received lines)
-  const { data:inbound } = await sb.from('v_incoming_receiving').select('*').limit(80);
+  const { data:inbound } = await sb.from('v_incoming_receiving').select('*').order('expected_arrival',{ascending:true}).limit(400);
   const el = $('#inbound');
   if(!inbound || !inbound.length){ el.innerHTML = '<div class="empty">Nothing arriving right now. Check items in manually below as they arrive.</div>'; }
   else el.innerHTML = inbound.map(r=>`

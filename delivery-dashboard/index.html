@@ -602,7 +602,7 @@ async function loadCalendar(){
   const monStr = _ymd(mon), sunStr = _ymd(sun), todayStr = _ymd(new Date());
 
   const { data:ev } = await sb.from('calendar_events').select('*')
-    .eq('type','delivery').eq('deleted',false).neq('source','seed')
+    .in('type',['delivery','staff']).eq('deleted',false).neq('source','seed')
     .gte('event_date',monStr).lte('event_date',sunStr).order('event_date');
   const byDate = {}; (ev||[]).forEach(e=> (byDate[e.event_date]=byDate[e.event_date]||[]).push(e));
 
@@ -622,7 +622,7 @@ async function loadCalendar(){
       <div class="calevents">
         ${list.length ? list.map(e=>`
           <div class="calevt" data-ev="${e.id}">
-            <div class="row"><div class="title">🚚 ${esc(e.title||'Delivery')}</div>${e.time_label?`<span class="pill blue">${esc(e.time_label)}</span>`:''}</div>
+            <div class="row"><div class="title">${e.type==='staff'?'🗓':'🚚'} ${esc(e.title||(e.type==='staff'?'Staff schedule':'Delivery'))}</div>${e.time_label?`<span class="pill blue">${esc(e.time_label)}</span>`:''}</div>
             <div class="calnotes hidden" id="n_${e.id}">${e.notes ? esc(e.notes) : '<span class="calmuted">No notes.</span>'}</div>
           </div>`).join('')
         : '<div class="calnoev">—</div>'}
